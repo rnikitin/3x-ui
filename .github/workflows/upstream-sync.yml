@@ -6,6 +6,7 @@ on:
     - cron: "17 3 * * *"
 
 permissions:
+  actions: write
   contents: write
   issues: write
 
@@ -169,6 +170,43 @@ jobs:
       - name: Push synced branch
         if: success() && steps.merge.outputs.changed == 'true'
         run: git push origin HEAD:main
+
+      - name: Dispatch installable release
+        if: success() && steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags origin
+          latest_tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || echo v0.0.0)"
+          version="${latest_tag#v}"
+          version="${version%%-*}"
+
+          IFS='.' read -r major minor patch <<EOF
+          $version
+          EOF
+
+          if ! [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]]; then
+            major=0
+            minor=0
+            patch=0
+          fi
+
+          while :; do
+            patch=$((patch + 1))
+            next_tag="v${major}.${minor}.${patch}"
+            if ! git rev-parse -q --verify "refs/tags/$next_tag" >/dev/null \
+              && ! git ls-remote --exit-code --tags origin "refs/tags/$next_tag" >/dev/null 2>&1; then
+              break
+            fi
+          done
+
+          git tag -a "$next_tag" -m "$next_tag upstream sync"
+          git push origin "$next_tag"
+          gh workflow run "Release 3X-UI" --repo "$GITHUB_REPOSITORY" --ref "$next_tag"
+
+          echo "Created $next_tag and dispatched Release 3X-UI."
 
       - name: Close resolved sync issue
         if: success() && steps.merge.outputs.conflict == 'false'
