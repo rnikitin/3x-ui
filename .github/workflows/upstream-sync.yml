@@ -1,0 +1,238 @@
+name: Sync upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: upstream-sync-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge upstream
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git remote add upstream https://github.com/MHSanaei/3x-ui.git
+          git fetch upstream main
+
+          before_sha="$(git rev-parse HEAD)"
+          upstream_sha="$(git rev-parse upstream/main)"
+          echo "before_sha=$before_sha" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
+
+          if git merge-base --is-ancestor "$upstream_sha" HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+          git merge --no-edit --no-ff upstream/main
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            conflict_files="$(git diff --name-only --diff-filter=U | sed 's/^/- /' || true)"
+            git merge --abort || true
+
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "conflict_files<<EOF"
+              if [ -n "$conflict_files" ]; then
+                echo "$conflict_files"
+              else
+                echo "- (no conflicted files captured)"
+              fi
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          after_sha="$(git rev-parse HEAD)"
+          echo "after_sha=$after_sha" >> "$GITHUB_OUTPUT"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "conflict=false" >> "$GITHUB_OUTPUT"
+
+      - name: Report merge conflict
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_SHA: ${{ steps.merge.outputs.upstream_sha }}
+          CONFLICT_FILES: ${{ steps.merge.outputs.conflict_files }}
+        run: |
+          set -euo pipefail
+
+          gh label create upstream-sync \
+            --repo "$GITHUB_REPOSITORY" \
+            --color "fbca04" \
+            --description "Automatic upstream synchronization" \
+            --force >/dev/null 2>&1 || true
+
+          {
+            echo "Automatic sync from \`MHSanaei/3x-ui:main\` failed because the upstream merge has conflicts."
+            echo
+            echo "- Upstream SHA: \`$UPSTREAM_SHA\`"
+            echo "- Target branch: \`main\`"
+            echo "- Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            echo "Conflicted files:"
+            printf '%s\n' "$CONFLICT_FILES"
+            echo
+            echo "Resolve locally:"
+            echo
+            echo '```bash'
+            echo "git fetch origin main"
+            echo "git fetch https://github.com/MHSanaei/3x-ui.git main"
+            echo "git checkout main"
+            echo "git merge FETCH_HEAD"
+            echo "# resolve conflicts, run tests, commit, push"
+            echo '```'
+          } > /tmp/upstream-sync.md
+
+          issue_number="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --label upstream-sync \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -n "$issue_number" ]; then
+            gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/upstream-sync.md
+          else
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Upstream sync conflict" \
+              --label upstream-sync \
+              --body-file /tmp/upstream-sync.md
+          fi
+
+          exit 1
+
+      - name: Setup Go
+        if: steps.merge.outputs.changed == 'true'
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Node.js
+        if: steps.merge.outputs.changed == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Test Go
+        if: steps.merge.outputs.changed == 'true'
+        run: |
+          mkdir -p internal/web/dist
+          touch internal/web/dist/.gitkeep
+          go list ./... | grep -v '/frontend/node_modules/' > /tmp/go-packages.txt
+          go test -shuffle=on -count=1 $(cat /tmp/go-packages.txt)
+
+      - name: Validate frontend
+        if: steps.merge.outputs.changed == 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run gen
+          git diff --exit-code -- src/generated public/openapi.json
+          npm run lint
+          npm run typecheck
+          npm run build
+          git diff --exit-code -- src/generated public/openapi.json
+
+      - name: Push synced branch
+        if: success() && steps.merge.outputs.changed == 'true'
+        run: git push origin HEAD:main
+
+      - name: Close resolved sync issue
+        if: success() && steps.merge.outputs.conflict == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh label create upstream-sync \
+            --repo "$GITHUB_REPOSITORY" \
+            --color "fbca04" \
+            --description "Automatic upstream synchronization" \
+            --force >/dev/null 2>&1 || true
+
+          issue_number="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --label upstream-sync \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -n "$issue_number" ]; then
+            gh issue close "$issue_number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --comment "Upstream sync succeeded in $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID."
+          fi
+
+      - name: Report sync failure
+        if: failure() && steps.merge.outputs.changed == 'true' && steps.merge.outputs.conflict != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_SHA: ${{ steps.merge.outputs.upstream_sha }}
+          MERGE_SHA: ${{ steps.merge.outputs.after_sha }}
+        run: |
+          set -euo pipefail
+
+          gh label create upstream-sync \
+            --repo "$GITHUB_REPOSITORY" \
+            --color "fbca04" \
+            --description "Automatic upstream synchronization" \
+            --force >/dev/null 2>&1 || true
+
+          {
+            echo "Automatic sync from \`MHSanaei/3x-ui:main\` merged locally, but validation or push failed before completing the sync."
+            echo
+            echo "- Upstream SHA: \`$UPSTREAM_SHA\`"
+            echo "- Local merge SHA: \`$MERGE_SHA\`"
+            echo "- Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            echo "Check the failed step in the workflow logs. If the push failed because \`main\` moved, rerun the workflow."
+          } > /tmp/upstream-sync.md
+
+          issue_number="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --label upstream-sync \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -n "$issue_number" ]; then
+            gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/upstream-sync.md
+          else
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Upstream sync failed" \
+              --label upstream-sync \
+              --body-file /tmp/upstream-sync.md
+          fi
