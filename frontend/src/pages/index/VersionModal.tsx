@@ -27,6 +27,8 @@ const GEOFILES = [
   'geoip_IR.dat',
   'geosite_RU.dat',
   'geoip_RU.dat',
+  'geosite_ROSCOM.dat',
+  'geoip_ROSCOM.dat',
 ];
 
 export default function VersionModal({ open, status, onClose, onBusy }: VersionModalProps) {

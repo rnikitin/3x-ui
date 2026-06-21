@@ -32,9 +32,32 @@ type PanelUpdateInfo struct {
 }
 
 const (
-	panelUpdaterURL      = "https://raw.githubusercontent.com/MHSanaei/3x-ui/main/update.sh"
+	defaultPanelRepo     = "rnikitin/3x-ui"
+	defaultPanelBranch   = "main"
 	maxPanelUpdaterBytes = 2 << 20
 )
+
+func panelRepo() string {
+	if repo := strings.TrimSpace(os.Getenv("XUI_REPO")); repo != "" {
+		return repo
+	}
+	return defaultPanelRepo
+}
+
+func panelBranch() string {
+	if branch := strings.TrimSpace(os.Getenv("XUI_REPO_BRANCH")); branch != "" {
+		return branch
+	}
+	return defaultPanelBranch
+}
+
+func panelRawURL(path string) string {
+	return fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s", panelRepo(), panelBranch(), path)
+}
+
+func panelLatestReleaseAPI() string {
+	return fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", panelRepo())
+}
 
 func (s *PanelService) RestartPanel(delay time.Duration) error {
 	go func() {
@@ -97,6 +120,8 @@ func (s *PanelService) StartUpdate() error {
 			"--unit", unitName,
 			"--setenv", "XUI_MAIN_FOLDER="+mainFolder,
 			"--setenv", "XUI_SERVICE="+serviceFolder,
+			"--setenv", "XUI_REPO="+panelRepo(),
+			"--setenv", "XUI_REPO_BRANCH="+panelBranch(),
 			bash, "-lc", updateScript,
 		)
 		out, err := cmd.CombinedOutput()
@@ -118,6 +143,8 @@ func (s *PanelService) StartUpdate() error {
 	cmd.Env = append(os.Environ(),
 		"XUI_MAIN_FOLDER="+mainFolder,
 		"XUI_SERVICE="+serviceFolder,
+		"XUI_REPO="+panelRepo(),
+		"XUI_REPO_BRANCH="+panelBranch(),
 	)
 	setDetachedProcess(cmd)
 	if err := cmd.Start(); err != nil {
@@ -133,7 +160,7 @@ func (s *PanelService) StartUpdate() error {
 
 func downloadPanelUpdater() (string, error) {
 	client := (&service.SettingService{}).NewProxiedHTTPClient(15 * time.Second)
-	resp, err := client.Get(panelUpdaterURL)
+	resp, err := client.Get(panelRawURL("update.sh"))
 	if err != nil {
 		return "", fmt.Errorf("download panel updater: %w", err)
 	}
@@ -171,7 +198,7 @@ func downloadPanelUpdater() (string, error) {
 
 func fetchLatestPanelVersion() (string, error) {
 	client := (&service.SettingService{}).NewProxiedHTTPClient(10 * time.Second)
-	resp, err := client.Get("https://api.github.com/repos/MHSanaei/3x-ui/releases/latest")
+	resp, err := client.Get(panelLatestReleaseAPI())
 	if err != nil {
 		return "", err
 	}

@@ -1567,6 +1567,14 @@ func (s *ServerService) UpdateGeofile(fileName string) error {
 		"geosite_IR.dat": {"https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat", "geosite_IR.dat"},
 		"geoip_RU.dat":   {"https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat", "geoip_RU.dat"},
 		"geosite_RU.dat": {"https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat", "geosite_RU.dat"},
+		"geoip_ROSCOM.dat": {
+			"https://github.com/hydraponique/roscomvpn-geoip/releases/latest/download/geoip.dat",
+			"geoip_ROSCOM.dat",
+		},
+		"geosite_ROSCOM.dat": {
+			"https://github.com/hydraponique/roscomvpn-geosite/releases/latest/download/geosite.dat",
+			"geosite_ROSCOM.dat",
+		},
 	}
 
 	// Strict allowlist check to avoid writing uncontrolled files

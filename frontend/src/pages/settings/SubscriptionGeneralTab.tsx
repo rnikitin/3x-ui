@@ -1,4 +1,4 @@
-import { Input, InputNumber, Switch, Tabs } from 'antd';
+import { Input, InputNumber, Select, Switch, Tabs } from 'antd';
 import { BranchesOutlined, IdcardOutlined, InfoCircleOutlined, NodeIndexOutlined, SafetyCertificateOutlined, SettingOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { AllSetting } from '@/models/setting';
@@ -12,6 +12,13 @@ interface SubscriptionGeneralTabProps {
   allSetting: AllSetting;
   updateSetting: (patch: Partial<AllSetting>) => void;
 }
+
+const HAPP_ROUTING_SOURCE_OPTIONS = [
+  { label: 'RoscomVPN Default', value: 'default' },
+  { label: 'RoscomVPN JSONSub', value: 'jsonsub' },
+  { label: 'RoscomVPN Whitelist', value: 'whitelist' },
+  { label: 'Custom', value: 'custom' },
+];
 
 export default function SubscriptionGeneralTab({ allSetting, updateSetting }: SubscriptionGeneralTabProps) {
   const { t } = useTranslation();
@@ -148,6 +155,13 @@ export default function SubscriptionGeneralTab({ allSetting, updateSetting }: Su
           <>
             <SettingListItem paddings="small" title={t('pages.settings.subEnableRouting')} description={t('pages.settings.subEnableRoutingDesc')}>
               <Switch checked={allSetting.subEnableRouting} onChange={(v) => updateSetting({ subEnableRouting: v })} />
+            </SettingListItem>
+            <SettingListItem paddings="small" title={t('pages.settings.subRoutingSource')} description={t('pages.settings.subRoutingSourceDesc')}>
+              <Select
+                value={allSetting.subRoutingSource || 'default'}
+                options={HAPP_ROUTING_SOURCE_OPTIONS}
+                onChange={(v) => updateSetting({ subRoutingSource: v })}
+              />
             </SettingListItem>
             <SettingListItem paddings="small" title={t('pages.settings.subRoutingRules')} description={t('pages.settings.subRoutingRulesDesc')}>
               <Input.TextArea value={allSetting.subRoutingRules} placeholder="happ://routing/add/..."

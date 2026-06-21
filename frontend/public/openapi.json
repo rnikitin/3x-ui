@@ -281,6 +281,10 @@
             "description": "Subscription global routing rules (Only for Happ)",
             "type": "string"
           },
+          "subRoutingSource": {
+            "description": "Routing rules source: default, jsonsub, whitelist, or custom",
+            "type": "string"
+          },
           "subSupportUrl": {
             "description": "Subscription support URL",
             "type": "string"
@@ -469,6 +473,7 @@
           "subPort",
           "subProfileUrl",
           "subRoutingRules",
+          "subRoutingSource",
           "subSupportUrl",
           "subThemeDir",
           "subTitle",
@@ -776,6 +781,10 @@
             "description": "Subscription global routing rules (Only for Happ)",
             "type": "string"
           },
+          "subRoutingSource": {
+            "description": "Routing rules source: default, jsonsub, whitelist, or custom",
+            "type": "string"
+          },
           "subSupportUrl": {
             "description": "Subscription support URL",
             "type": "string"
@@ -971,6 +980,7 @@
           "subPort",
           "subProfileUrl",
           "subRoutingRules",
+          "subRoutingSource",
           "subSupportUrl",
           "subThemeDir",
           "subTitle",

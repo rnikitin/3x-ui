@@ -255,6 +255,10 @@ export const SCHEMAS: Record<string, unknown> = {
         "description": "Subscription global routing rules (Only for Happ)",
         "type": "string"
       },
+      "subRoutingSource": {
+        "description": "Routing rules source: default, jsonsub, whitelist, or custom",
+        "type": "string"
+      },
       "subSupportUrl": {
         "description": "Subscription support URL",
         "type": "string"
@@ -443,6 +447,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "subPort",
       "subProfileUrl",
       "subRoutingRules",
+      "subRoutingSource",
       "subSupportUrl",
       "subThemeDir",
       "subTitle",
@@ -750,6 +755,10 @@ export const SCHEMAS: Record<string, unknown> = {
         "description": "Subscription global routing rules (Only for Happ)",
         "type": "string"
       },
+      "subRoutingSource": {
+        "description": "Routing rules source: default, jsonsub, whitelist, or custom",
+        "type": "string"
+      },
       "subSupportUrl": {
         "description": "Subscription support URL",
         "type": "string"
@@ -945,6 +954,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "subPort",
       "subProfileUrl",
       "subRoutingRules",
+      "subRoutingSource",
       "subSupportUrl",
       "subThemeDir",
       "subTitle",

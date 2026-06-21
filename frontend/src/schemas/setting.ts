@@ -38,6 +38,7 @@ export const AllSettingSchema = z.object({
   subProfileUrl: z.string().optional(),
   subAnnounce: z.string().optional(),
   subEnableRouting: z.boolean().optional(),
+  subRoutingSource: z.enum(['default', 'jsonsub', 'whitelist', 'custom']).optional(),
   subRoutingRules: z.string().optional(),
   subListen: z.string().optional(),
   subPort: port.optional(),

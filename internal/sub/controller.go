@@ -47,6 +47,7 @@ type SUBController struct {
 	subProfileUrl    string
 	subAnnounce      string
 	subEnableRouting bool
+	subRoutingSource string
 	subRoutingRules  string
 	subHideSettings  bool
 	subPath          string
@@ -87,6 +88,7 @@ func NewSUBController(
 	subProfileUrl string,
 	subAnnounce string,
 	subEnableRouting bool,
+	subRoutingSource string,
 	subRoutingRules string,
 	subHideSettings bool,
 ) *SUBController {
@@ -97,6 +99,7 @@ func NewSUBController(
 		subProfileUrl:    subProfileUrl,
 		subAnnounce:      subAnnounce,
 		subEnableRouting: subEnableRouting,
+		subRoutingSource: subRoutingSource,
 		subRoutingRules:  subRoutingRules,
 		subHideSettings:  subHideSettings,
 		subPath:          subPath,
@@ -181,7 +184,7 @@ func (a *SUBController) subs(c *gin.Context) {
 		if profileUrl == "" {
 			profileUrl = fmt.Sprintf("%s://%s%s", scheme, hostWithPort, c.Request.RequestURI)
 		}
-		a.ApplyCommonHeaders(c, header, a.updateInterval, a.subTitle, a.subSupportUrl, profileUrl, a.subAnnounce, a.subEnableRouting, a.subRoutingRules, a.subHideSettings)
+		a.ApplyCommonHeaders(c, header, a.updateInterval, a.subTitle, a.subSupportUrl, profileUrl, a.subAnnounce, a.subEnableRouting, a.subRoutingSource, a.subRoutingRules, a.subHideSettings)
 
 		if a.subEncrypt {
 			c.String(200, base64.StdEncoding.EncodeToString([]byte(result.String())))
@@ -360,7 +363,7 @@ func (a *SUBController) subJsons(c *gin.Context) {
 		if profileUrl == "" {
 			profileUrl = fmt.Sprintf("%s://%s%s", scheme, hostWithPort, c.Request.RequestURI)
 		}
-		a.ApplyCommonHeaders(c, header, a.updateInterval, a.subTitle, a.subSupportUrl, profileUrl, a.subAnnounce, a.subEnableRouting, a.subRoutingRules, a.subHideSettings)
+		a.ApplyCommonHeaders(c, header, a.updateInterval, a.subTitle, a.subSupportUrl, profileUrl, a.subAnnounce, a.subEnableRouting, a.subRoutingSource, a.subRoutingRules, a.subHideSettings)
 
 		c.String(200, jsonSub)
 	}
@@ -377,7 +380,7 @@ func (a *SUBController) subClashs(c *gin.Context) {
 		if profileUrl == "" {
 			profileUrl = fmt.Sprintf("%s://%s%s", scheme, hostWithPort, c.Request.RequestURI)
 		}
-		a.ApplyCommonHeaders(c, header, a.updateInterval, a.subTitle, a.subSupportUrl, profileUrl, a.subAnnounce, a.subEnableRouting, a.subRoutingRules, a.subHideSettings)
+		a.ApplyCommonHeaders(c, header, a.updateInterval, a.subTitle, a.subSupportUrl, profileUrl, a.subAnnounce, a.subEnableRouting, a.subRoutingSource, a.subRoutingRules, a.subHideSettings)
 		if a.subTitle != "" {
 			// Clash clients commonly use Content-Disposition to choose the imported profile name.
 			c.Writer.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename*=UTF-8''%s`, url.PathEscape(a.subTitle)))
@@ -396,6 +399,7 @@ func (a *SUBController) ApplyCommonHeaders(
 	profileUrl string,
 	profileAnnounce string,
 	profileEnableRouting bool,
+	profileRoutingSource string,
 	profileRoutingRules string,
 	profileHideSettings bool,
 ) {
@@ -418,8 +422,10 @@ func (a *SUBController) ApplyCommonHeaders(
 
 	//Advanced (Happ)
 	c.Writer.Header().Set("Routing-Enable", strconv.FormatBool(profileEnableRouting))
-	if profileRoutingRules != "" {
-		c.Writer.Header().Set("Routing", profileRoutingRules)
+	if profileEnableRouting {
+		if rules := ResolveRoutingRules(profileRoutingSource, profileRoutingRules); rules != "" {
+			c.Writer.Header().Set("Routing", rules)
+		}
 	}
 	if profileHideSettings {
 		c.Writer.Header().Set("Hide-Settings", "1")

@@ -1218,6 +1218,8 @@
       "subThemeDirDocs": "Template guide ↗",
       "subEnableRouting": "Enable routing",
       "subEnableRoutingDesc": "Global setting to enable routing in the VPN client. (Only for Happ)",
+      "subRoutingSource": "Routing source",
+      "subRoutingSourceDesc": "Choose a RoscomVPN routing preset from hydraponique or use custom routing rules.",
       "subRoutingRules": "Routing rules",
       "subRoutingRulesDesc": "Global routing rules for the VPN client. (Only for Happ)",
       "subHideSettings": "Hide server settings",

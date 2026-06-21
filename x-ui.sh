@@ -93,6 +93,9 @@ else
     xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
 fi
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
+xui_repo="${XUI_REPO:-rnikitin/3x-ui}"
+xui_repo_branch="${XUI_REPO_BRANCH:-main}"
+xui_raw_url="https://raw.githubusercontent.com/${xui_repo}/${xui_repo_branch}"
 log_folder="${XUI_LOG_FOLDER:=/var/log/x-ui}"
 mkdir -p "${log_folder}"
 iplimit_log_path="${log_folder}/3xipl.log"
@@ -129,7 +132,7 @@ before_show_menu() {
 }
 
 install() {
-    bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/main/install.sh)
+    bash <(curl -Ls "${xui_raw_url}/install.sh")
     if [[ $? == 0 ]]; then
         if [[ $# == 0 ]]; then
             start
@@ -148,7 +151,7 @@ update() {
         fi
         return 0
     fi
-    bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/main/update.sh)
+    bash <(curl -Ls "${xui_raw_url}/update.sh")
     if [[ $? == 0 ]]; then
         LOGI "Update is complete, Panel has automatically restarted "
         before_show_menu
@@ -166,7 +169,7 @@ update_menu() {
         return 0
     fi
 
-    curl -fLRo /usr/bin/x-ui https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
+    curl -fLRo /usr/bin/x-ui "${xui_raw_url}/x-ui.sh"
     chmod +x ${xui_folder}/x-ui.sh
     chmod +x /usr/bin/x-ui
 
@@ -188,7 +191,7 @@ legacy_version() {
         exit 1
     fi
     # Use the entered panel version in the download link
-    install_command="bash <(curl -Ls "https://raw.githubusercontent.com/mhsanaei/3x-ui/v$tag_version/install.sh") v$tag_version"
+    install_command="bash <(curl -Ls \"https://raw.githubusercontent.com/${xui_repo}/v${tag_version}/install.sh\") v${tag_version}"
 
     echo "Downloading and installing panel version $tag_version..."
     eval $install_command
@@ -242,7 +245,7 @@ uninstall() {
     echo ""
     echo -e "Uninstalled Successfully.\n"
     echo "If you need to install this panel again, you can use below command:"
-    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)${plain}"
+    echo -e "${green}bash <(curl -Ls ${xui_raw_url}/install.sh)${plain}"
     echo ""
     # Trap the SIGTERM signal
     trap delete_script SIGTERM
@@ -775,7 +778,7 @@ enable_bbr() {
 }
 
 update_shell() {
-    curl -fLRo /usr/bin/x-ui -z /usr/bin/x-ui https://github.com/MHSanaei/3x-ui/raw/main/x-ui.sh
+    curl -fLRo /usr/bin/x-ui -z /usr/bin/x-ui "${xui_raw_url}/x-ui.sh"
     if [[ $? != 0 ]]; then
         echo ""
         LOGE "Failed to download script, Please check whether the machine can connect Github"
@@ -1152,6 +1155,7 @@ update_all_geofiles() {
     update_geofiles "main" || failed=1
     update_geofiles "IR" || failed=1
     update_geofiles "RU" || failed=1
+    update_geofiles "ROSCOM" || failed=1
     return $failed
 }
 
@@ -1169,14 +1173,28 @@ update_geofiles() {
             dat_files=(geoip_RU geosite_RU)
             dat_source="runetfreedom/russia-v2ray-rules-dat"
             ;;
+        "ROSCOM")
+            dat_files=(geoip_ROSCOM geosite_ROSCOM)
+            ;;
     esac
     local failed=0 http_code
     for dat in "${dat_files[@]}"; do
-        # Remove suffix for remote filename (e.g., geoip_IR -> geoip)
-        remote_file="${dat%%_*}"
+        case "${dat}" in
+            geoip_ROSCOM)
+                remote_url="https://github.com/hydraponique/roscomvpn-geoip/releases/latest/download/geoip.dat"
+                ;;
+            geosite_ROSCOM)
+                remote_url="https://github.com/hydraponique/roscomvpn-geosite/releases/latest/download/geosite.dat"
+                ;;
+            *)
+                # Remove suffix for remote filename (e.g., geoip_IR -> geoip)
+                remote_file="${dat%%_*}"
+                remote_url="https://github.com/${dat_source}/releases/latest/download/${remote_file}.dat"
+                ;;
+        esac
         # -z skips the download (server answers 304) when the local copy is already current
         http_code=$(curl -sSfLRo ${xui_folder}/bin/${dat}.dat -z ${xui_folder}/bin/${dat}.dat -w '%{http_code}' \
-            https://github.com/${dat_source}/releases/latest/download/${remote_file}.dat)
+            "${remote_url}")
         if [[ $? -ne 0 ]]; then
             echo -e "${red}${dat}.dat: download failed${plain}"
             failed=1
@@ -1209,7 +1227,8 @@ update_geo() {
     echo -e "${green}\t1.${plain} Loyalsoldier (geoip.dat, geosite.dat)"
     echo -e "${green}\t2.${plain} chocolate4u (geoip_IR.dat, geosite_IR.dat)"
     echo -e "${green}\t3.${plain} runetfreedom (geoip_RU.dat, geosite_RU.dat)"
-    echo -e "${green}\t4.${plain} All"
+    echo -e "${green}\t4.${plain} RoscomVPN (geoip_ROSCOM.dat, geosite_ROSCOM.dat)"
+    echo -e "${green}\t5.${plain} All"
     echo -e "${green}\t0.${plain} Back to Main Menu"
     read -rp "Choose an option: " choice
 
@@ -1226,9 +1245,12 @@ update_geo() {
         3)
             run_geo_update "runetfreedom datasets" update_geofiles "RU"
             ;;
-        4)
-            run_geo_update "geo files" update_all_geofiles
-            ;;
+    4)
+        run_geo_update "RoscomVPN datasets" update_geofiles "ROSCOM"
+        ;;
+    5)
+        run_geo_update "geo files" update_all_geofiles
+        ;;
         *)
             echo -e "${red}Invalid option. Please select a valid number.${plain}\n"
             update_geo

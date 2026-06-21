@@ -170,6 +170,11 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 		SubRoutingRules = ""
 	}
 
+	SubRoutingSource, err := s.settingService.GetSubRoutingSource()
+	if err != nil || SubRoutingSource == "" {
+		SubRoutingSource = RoscomVPNSourceDefault
+	}
+
 	SubHideSettings, err := s.settingService.GetSubHideSettings()
 	if err != nil {
 		SubHideSettings = false
@@ -232,7 +237,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	s.sub = NewSUBController(
 		g, LinksPath, JsonPath, ClashPath, subJsonEnable, subClashEnable, Encrypt, RemarkTemplate, SubUpdates,
 		SubJsonMux, SubJsonRules, SubJsonFinalMask, SubClashEnableRouting, SubClashRules, SubTitle, SubSupportUrl,
-		SubProfileUrl, SubAnnounce, SubEnableRouting, SubRoutingRules, SubHideSettings)
+		SubProfileUrl, SubAnnounce, SubEnableRouting, SubRoutingSource, SubRoutingRules, SubHideSettings)
 
 	return engine, nil
 }
